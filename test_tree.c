@@ -22,12 +22,188 @@
 
 #define INPUT_MAXLINE (1024)
 
-/* @@TODO: red/black verification procedure */
+/*
+ * Verify that a given node and its subtree obey the rules of red-black
+ * trees, and that nodes are linked properly together.
+ * 
+ * This procedure is not designed to detect circular linking, and
+ * undefined behavior occurs if there are circular references in the
+ * tree.  (Proper trees should never have circular references.)
+ * Recursion is used, so this function may fail if the recursive depth
+ * is very large.  Overflow may happen if the depth exceeds the range of
+ * a signed integer.
+ * 
+ * pNode is the node to verify.  If it is NULL, then this function call
+ * is ignored and true is returned.
+ * 
+ * pParent is the parent of the node to verify, or NULL if the root node
+ * is being verified.  The function will check that the parent point of
+ * the given node equals this parameter, to make sure the tree is linked
+ * properly.  It will also make sure that the key relation of parent
+ * nodes to their children holds.
+ * 
+ * black_depth is the number of black nodes that have been visited prior
+ * to this node.  It must be zero or greater.  Zero should be passed
+ * when verifying the root node.
+ * 
+ * pexit_depth is a pointer to a variable used to keep track of the
+ * black depth of exit nodes.  This may not be NULL.  The variable
+ * should be initialized to -1 before verifying the root node, meaning
+ * that no black depth of exit node has been established yet.  When the
+ * first exit node is reached, it writes its black depth to this
+ * variable.  All subsequent exit nodes that are visited must have the
+ * same black depth.
+ * 
+ * Parameters:
+ * 
+ *   pNode - the node to verify, or NULL
+ * 
+ *   pParent - the parent of the node to verify, or NULL if the node to
+ *   verify is the root node
+ * 
+ *   black_depth - the number of black nodes that have been visited
+ *   before this node
+ * 
+ *   pexit_depth - pointer to the exit node black depth variable
+ * 
+ * Return:
+ * 
+ *   non-zero if subtree verified, zero if verification failed
+ */
+int verify_tree(
+    SNDICT_NODE *pNode,
+    SNDICT_NODE *pParent,
+    int black_depth,
+    int *pexit_depth) {
+  
+  int status = 1;
+  
+  /* Check parameters */
+  if ((black_depth < 0) || (pexit_depth == NULL)) {
+    abort();
+  }
+  if (*pexit_depth < -1) {
+    abort();
+  }
+  
+  /* Verify only if passed node is not NULL */
+  if (pNode != NULL) {
+    
+    /* First, verify the node's parent pointer matches the passed parent
+     * pointer value (which may be NULL if this is the root node) */
+    if (pNode->pParent != pParent) {
+      status = 0;
+      fprintf(stderr, "Parent check failed!\n");
+    }
+    
+    /* Second, if this is not the root node, verify that this node is
+     * one of the parent's children; furthermore, if the left node,
+     * verify the key is less than the parent's and if the right node,
+     * verify the key is greater than the parent's */
+    if (status && (pParent != NULL)) {
+      if (pParent->pLeft == pNode) {
+        /* Left child of parent -- make sure not also right child */
+        if (pParent->pRight == pNode) {
+          status = 0;
+        }
+        
+        /* Make sure parent's key is greater than current node's key */
+        if (status) {
+          if (strcmp(&((pParent->key)[0]), &((pNode->key)[0])) <= 0) {
+            status = 0;
+          }
+        }
+        
+      } else if (pParent->pRight == pNode) {
+        /* Right child of parent -- make sure not also left child */
+        if (pParent->pLeft == pNode) {
+          status = 0;
+        }
+        
+        /* Make sure parent's key is less than current node's key */
+        if (status) {
+          if (strcmp(&((pParent->key)[0]), &((pNode->key)[0])) >= 0) {
+            status = 0;
+          }
+        }
+        
+      } else {
+        /* Not a child of the parent -- linking error */
+        status = 0;
+      }
+      
+      if (!status) {
+        fprintf(stderr, "Relation check failed!\n");
+      }
+    }
+    
+    /* Third, if this is the root node, verify that it is black */
+    if (status && (pParent == NULL)) {
+      if (pNode->red) {
+        status = 0;
+        fprintf(stderr, "Root black check failed!\n");
+      }
+    }
+    
+    /* Fourth, if this is a red node, verify that it has a parent that
+     * is not a red node */
+    if (status && pNode->red) {
+      if (pParent != NULL) {
+        if (pParent->red) {
+          status = 0;
+        }
+      } else {
+        status = 0;
+      }
+      if (!status) {
+        fprintf(stderr, "Red relation check failed!\n");
+      }
+    }
+    
+    /* Fifth, if this is a black node, increase the black depth, 
+     * faulting if there is an overflow */
+    if (status && (!(pNode->red))) {
+      if (black_depth < INT_MAX) {
+        black_depth++;
+      } else {
+        abort();
+      }
+    }
+    
+    /* Sixth, if this is the first exit node, record its black depth */
+    if (status && ((pNode->pLeft == NULL) || (pNode->pRight == NULL)) &&
+          (*pexit_depth == -1)) {
+      *pexit_depth = black_depth;
+    }
+    
+    /* Seventh, if this is an exit node, make sure it has the right
+     * black depth */
+    if (status && ((pNode->pLeft == NULL) || (pNode->pRight == NULL))) {
+      if (*pexit_depth != black_depth) {
+        status = 0;
+        fprintf(stderr, "Exit depth check failed!\n");
+      }
+    }
+    
+    /* Eighth, recursively verify the subtrees */
+    if (status) {
+      status = verify_tree(
+        pNode->pLeft, pNode, black_depth, pexit_depth);
+    }
+    if (status) {
+      status = verify_tree(
+        pNode->pRight, pNode, black_depth, pexit_depth);
+    }
+  }
+  
+  /* Return verification results */
+  return status;
+}
 
 /*
  * @@TODO:
  */
-void print_tree(SNDICT_NODE *pNode, int depth) {
+void print_tree(SNDICT_NODE *pNode, int depth, FILE *pOut) {
   
   int i = 0;
   
@@ -38,20 +214,24 @@ void print_tree(SNDICT_NODE *pNode, int depth) {
   
   /* If there is a left subtree, recursively print it */
   if (pNode->pLeft != NULL) {
-    print_tree(pNode->pLeft, depth + 1);
+    print_tree(pNode->pLeft, depth + 1, pOut);
   }
   
   /* Print a number of spaces equal to the depth */
   for(i = 0; i < depth; i++) {
-    putchar(0x20);
+    putc(0x20, pOut);
   }
   
-  /* Print the current key */
-  printf("%s\n", &((pNode->key)[0]));
+  /* Print the current key, along with a color prefix */
+  if (pNode->red) {
+    fprintf(pOut, "r:%s\n", &((pNode->key)[0]));
+  } else {
+    fprintf(pOut, "b:%s\n", &((pNode->key)[0]));
+  }
   
   /* If there is a right subtree, recursively print it */
   if (pNode->pRight != NULL) {
-    print_tree(pNode->pRight, depth + 1);
+    print_tree(pNode->pRight, depth + 1, pOut);
   }
 }
 
@@ -65,6 +245,7 @@ int main(int argc, char *argv[]) {
   int status = 1;
   int x = 0;
   int line = 0;
+  int exit_depth = -1;
   char *pc = NULL;
   
   /* Initialize buffer */
@@ -124,6 +305,17 @@ int main(int argc, char *argv[]) {
       }
     }
     
+    /* Verify new tree is valid */
+    if (status) {
+      exit_depth = -1;
+      if (!verify_tree(pDict->pRoot, NULL, 0, &exit_depth)) {
+        status = 0;
+        fprintf(stderr, "Line %d: Tree verification failed!\n", line);
+        fprintf(stderr, "Erroneous tree:\n");
+        print_tree(pDict->pRoot, 0, stderr);
+      }
+    }
+    
     /* Leave loop if error */
     if (!status) {
       break;
@@ -138,10 +330,22 @@ int main(int argc, char *argv[]) {
     }
   }
   
+  /* Verify the tree and print exit depth */
+  if (status) {
+    exit_depth = -1;
+    if (verify_tree(pDict->pRoot, NULL, 0, &exit_depth)) {
+      printf("\nTree verified, black depth %d.\n", exit_depth);
+      
+    } else {
+      status = 0;
+      fprintf(stderr, "Tree verification failed!\n");
+    }
+  }
+  
   /* Print the tree */
   if (status) {
     if (pDict->pRoot != NULL) {
-      print_tree(pDict->pRoot, 0);
+      print_tree(pDict->pRoot, 0, stdout);
     }
   }
   

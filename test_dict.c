@@ -42,7 +42,7 @@
 #define INPUT_MAXLINE (1024)
 
 /*
- * @@TODO:
+ * Program entrypoint.
  */
 int main(int argc, char *argv[]) {
   
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     /* Insert trimmed string as key, with line number as value, unless
      * trimmed length is zero, in which case line is blank */
     if (status && (strlen(&(buf[x])) > 0)) {
-      if (!rfdict_insert(pDict, &(buf[x]), line, 0)) {
+      if (!rfdict_insert(pDict, &(buf[x]), line)) {
         fprintf(stderr, "Duplicate key!  Line %d\n", line);
         status = 0;
       }
@@ -172,13 +172,6 @@ int main(int argc, char *argv[]) {
   }
   if (status) {
     strcpy(&(buf[0]), argv[2]);
-  }
-  
-  /* Convert key to ASCII */
-  if (status) {
-    for(x = 0; buf[x] != 0; x++) {
-      buf[x] = rf_ctable_ascii(buf[x]);
-    }
   }
   
   /* End-trim characters not in visible ASCII range */

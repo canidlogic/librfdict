@@ -1,29 +1,26 @@
-#ifndef SHASTINA_UTIL_H_INCLUDED
-#define SHASTINA_UTIL_H_INCLUDED
+#ifndef RFDICT_H_INCLUDED
+#define RFDICT_H_INCLUDED
 
 /*
- * shastina_util.h
- * 
- * Utility module for Shastina.  This is completely separate from the
- * main Shastina module, but it has auxiliary functions that are useful.
+ * rfdict.h
  */
 
 #include <stddef.h>
 
 /* Structure prototypes */
-struct SNDICT_TAG;
-typedef struct SNDICT_TAG SNDICT;
+struct RFDICT_TAG;
+typedef struct RFDICT_TAG RFDICT;
 
 /*
  * The maximum length of a dictionary key in bytes, not including the
  * terminating null.
  * 
- * This value plus the size of the SNDICT_NODE structure (defined in the
+ * This value plus the size of the RFDICT_NODE structure (defined in the
  * implementation) must not exceed the maximum value of a size_t and
  * must not exceed the range of a signed int, or undefined behavior
  * occurs.
  */
-#define SNDICT_MAXKEY (16384)
+#define RFDICT_MAXKEY (16384)
 
 /*
  * Initialize the character mapping table if not already initialized.
@@ -40,13 +37,13 @@ typedef struct SNDICT_TAG SNDICT;
  * This function is not thread safe, unless the table has already been
  * initialized.
  */
-void snu_ctable_prepare(void);
+void rf_ctable_prepare(void);
 
 /*
  * Map a character from the character set used in C source files to the
  * US-ASCII character set.
  * 
- * For example, snu_ctable_ascii('a') will return 0x61 (the US-ASCII
+ * For example, rf_ctable_ascii('a') will return 0x61 (the US-ASCII
  * code for a lowercase a), even if ((int) 'a') actually is something
  * else according to the character set used in C source files.
  * 
@@ -55,8 +52,8 @@ void snu_ctable_prepare(void);
  * 0x20-0x7e).  A fault occurs if any other character is passed.
  * 
  * This function is not thread safe, unless the character mapping table
- * has already been initialized with snu_ctable_prepare().  If thread
- * safe operation is required, call snu_ctable_prepare() explicitly at
+ * has already been initialized with rf_ctable_prepare().  If thread
+ * safe operation is required, call rf_ctable_prepare() explicitly at
  * the start of the program.  Otherwise, it will be called implicitly on
  * the first call to this function.
  * 
@@ -68,7 +65,7 @@ void snu_ctable_prepare(void);
  * 
  *   the US-ASCII equivalent of this character
  */
-int snu_ctable_ascii(int source_c);
+int rf_ctable_ascii(int source_c);
 
 /*
  * Allocate a new dictionary object.
@@ -77,7 +74,7 @@ int snu_ctable_ascii(int source_c);
  * comparisons will be case-sensitive.  Otherwise, key comparisons will
  * be case-insensitive.
  * 
- * Dictionaries must be freed with sndict_free().
+ * Dictionaries must be freed with rfdict_free().
  * 
  * Parameters:
  * 
@@ -88,7 +85,7 @@ int snu_ctable_ascii(int source_c);
  * 
  *   a new dictionary
  */
-SNDICT *sndict_alloc(int sensitive);
+RFDICT *rfdict_alloc(int sensitive);
 
 /*
  * Free a dictionary object.
@@ -99,7 +96,7 @@ SNDICT *sndict_alloc(int sensitive);
  * 
  *   pDict - the dictionary to free
  */
-void sndict_free(SNDICT *pDict);
+void rfdict_free(RFDICT *pDict);
 
 /*
  * Insert a new key/value pair into a given dictionary.
@@ -116,7 +113,7 @@ void sndict_free(SNDICT *pDict);
  * The key string may contain characters of any value (except for zero,
  * which is used as the terminating null character).
  * 
- * The length of the key may not exceed SNDICT_MAXKEY or a fault occurs.
+ * The length of the key may not exceed RFDICT_MAXKEY or a fault occurs.
  * 
  * val is the value to associate with the given key.  This may have any
  * long value.
@@ -124,10 +121,10 @@ void sndict_free(SNDICT *pDict);
  * If the translate flag is zero, then the key string is used as-is, and
  * may contain bytes of any value, as described above.  If the translate
  * flag is non-zero, each character in the key string will be translated
- * through snu_ctable_ascii() before being stored in the dictionary (see
+ * through rf_ctable_ascii() before being stored in the dictionary (see
  * that function for further information).  If the translate flag is
  * set, then each character in the string must be translateable by
- * snu_ctable_ascii() or a fault will occur.
+ * rf_ctable_ascii() or a fault will occur.
  * 
  * This function returns whether it succeeded.  If the function fails,
  * then the dictionary is unmodified.  Otherwise, the key/value pair is
@@ -148,8 +145,8 @@ void sndict_free(SNDICT *pDict);
  *   non-zero if successful, zero if function failed because key was
  *   already present in the dictionary
  */
-int sndict_insert(
-    SNDICT     * pDict,
+int rfdict_insert(
+    RFDICT     * pDict,
     const char * pKey,
     long         val,
     int          translate);
@@ -180,6 +177,6 @@ int sndict_insert(
  *   the value associated with the key, or dvalue if the key is not
  *   present in the dictionary
  */
-long sndict_get(SNDICT *pDict, const char *pKey, long dvalue);
+long rfdict_get(RFDICT *pDict, const char *pKey, long dvalue);
 
 #endif

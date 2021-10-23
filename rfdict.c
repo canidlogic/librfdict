@@ -132,31 +132,6 @@ struct RFDICT_NODE_TAG {
   
 };
 
-/*
- * The character mapping table.
- * 
- * The character table has 256 character elements.  It is only valid if
- * rf_ctable_init is non-zero.  Otherwise, it has not been initialized
- * yet.
- * 
- * When it is initialized, it maps characters from the character set
- * used in C source files into US-ASCII.  All visible, printing US-ASCII
- * characters are supported, as well as the space character.  However,
- * line feed, tabs, carriage returns, and other controls are NOT
- * supported.
- * 
- * To do this, first of all convert the char value into an integer.  If
- * the char value is less than zero (in the case of a signed char type),
- * add 256 to it, such that -1 maps to 255, -2 maps to 254, and so forth
- * down to -128 mapping to 128.
- * 
- * Use the adjusted character value (range 0-255) as an index into the
- * table.  If the value at the table is zero, the character has no ASCII
- * mapping.  Otherwise, it the character maps to the given ASCII value.
- */
-static char rf_ctable[256];
-static int  rf_ctable_init = 0;
-
 /* Function prototypes */
 static int rfdict_keycmp(
     const char * pKey1,
@@ -529,93 +504,6 @@ static void rfdict_ror(RFDICT_NODE *pNode, RFDICT *pDict) {
  */
 
 /*
- * rf_ctable_prepare function.
- */
-void rf_ctable_prepare(void) {
-  
-  /* ASCII characters from 0x20 to 0x7E, represented in the character
-   * set used in C source files */
-  static char char_ref[] =
-    " !\"#$%&'()*+,-./"
-    "0123456789:;<=>?"
-    "@ABCDEFGHIJKLMNO"
-    "PQRSTUVWXYZ[\\]^_"
-    "`abcdefghijklmno"
-    "pqrstuvwxyz{|}~";
-  int ascii_c = 0;
-  int source_c = 0;
-  
-  /* Only do something if not yet initialized */
-  if (!rf_ctable_init) {
-    
-    /* Clear the table to zero */
-    memset(&(rf_ctable[0]), 0, 256);
-    
-    /* Map all characters in char_ref */
-    for(ascii_c = 0x20; ascii_c <= 0x7E; ascii_c++) {
-      
-      /* Determine the source character code for this ASCII char */
-      source_c = char_ref[ascii_c - 0x20];
-      
-      /* Source character code can't be zero, because we need that for
-       * terminating null characters */
-      if (source_c == 0) {
-        abort();
-      }
-      
-      /* If source character code negative, add 256 to it to turn it
-       * into an unsigned value */
-      if (source_c < 0) {
-        source_c += 256;
-      }
-      
-      /* Table entry for the source value shouldn't be set yet */
-      if (rf_ctable[source_c] != 0) {
-        abort();
-      }
-      
-      /* Set the record in the mapping table */
-      rf_ctable[source_c] = (char) ascii_c;
-    }
-    
-    /* Set the initialization flag */
-    rf_ctable_init = 1;
-  }
-}
-
-/*
- * rf_ctable_ascii function.
- */
-int rf_ctable_ascii(int source_c) {
-  
-  int ascii_c = 0;
-  
-  /* Check range of source_c */
-  if ((source_c < -128) || (source_c > 255)) {
-    abort();
-  }
-  
-  /* Initialize table if not already initialized */
-  rf_ctable_prepare();
-  
-  /* If source_c is negative, add 256 to make it positive */
-  if (source_c < 0) {
-    source_c += 256;
-  }
-  
-  /* Look up the equivalent ASCII code */
-  ascii_c = rf_ctable[source_c];
-  
-  /* Fault if not recognized */
-  if (ascii_c == 0) {
-    abort();
-  }
-  
-  /* Return mapped ASCII character */
-  return ascii_c;
-}
-
-/*
  * rfdict_alloc function.
  */
 RFDICT *rfdict_alloc(int sensitive) {
@@ -703,8 +591,7 @@ void rfdict_free(RFDICT *pDict) {
 int rfdict_insert(
     RFDICT     * pDict,
     const char * pKey,
-    long         val,
-    int          translate) {
+    long         val) {
   
   size_t slen = 0;
   RFDICT_NODE *pNode = NULL;
@@ -742,13 +629,6 @@ int rfdict_insert(
   pNode->val = val;
   pNode->red = 0;
   strcpy(&((pNode->key)[0]), pKey);
-  
-  /* If translation was requested, perform translation */
-  if (translate) {
-    for(pc = &((pNode->key)[0]); *pc != 0; pc++) {
-      *pc = (char) rf_ctable_ascii(*pc);
-    }
-  }
   
   /* If dictionary is case-insensitive, map lowercase letters to
    * uppercase */

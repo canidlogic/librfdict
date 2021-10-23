@@ -154,4 +154,32 @@ int sndict_insert(
     long         val,
     int          translate);
 
+/*
+ * Get the value associated with a given key in a dictionary.
+ * 
+ * pDict is the dictionary to query.
+ * 
+ * pKey is the null-terminated key to check for.  No character
+ * translation is performed on the key.  Comparisons will be
+ * case-sensitive or case-insensitive depending on the dictionary
+ * setting.
+ * 
+ * dvalue is the value to return if the key is not present within the
+ * dictionary.
+ * 
+ * Parameters:
+ * 
+ *   pDict - the dictionary
+ * 
+ *   pKey - the key string
+ * 
+ *   dvalue - the default value to return if key not found
+ * 
+ * Return:
+ * 
+ *   the value associated with the key, or dvalue if the key is not
+ *   present in the dictionary
+ */
+long sndict_get(SNDICT *pDict, const char *pKey, long dvalue);
+
 #endif

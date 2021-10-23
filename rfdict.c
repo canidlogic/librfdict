@@ -1,12 +1,12 @@
 /*
- * shastina_util.c
+ * rfdict.c
  * 
- * Implementation of shastina_util.h
+ * Implementation of rfdict.h
  * 
  * See the header for further information.
  */
 
-#include "shastina_util.h"
+#include "rfdict.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -19,17 +19,17 @@
 #define ASCII_LOWER_Z (0x7a)    /* z */
 
 /* Structure prototypes */
-struct SNDICT_NODE_TAG;
-typedef struct SNDICT_NODE_TAG SNDICT_NODE;
+struct RFDICT_NODE_TAG;
+typedef struct RFDICT_NODE_TAG RFDICT_NODE;
 
 /*
- * The SNDICT structure.
+ * The RFDICT structure.
  * 
  * Structure prototype defined in the header.
  * 
- * Use the sndict_ functions to manipulate this structure.
+ * Use the rfdict_ functions to manipulate this structure.
  */
-struct SNDICT_TAG {
+struct RFDICT_TAG {
   /*
    * Pointer to the root node of the dictionary.
    * 
@@ -38,7 +38,7 @@ struct SNDICT_TAG {
    * All nodes are dynamically allocated, and must be freed before this
    * structure is freed.
    */
-  SNDICT_NODE *pRoot;
+  RFDICT_NODE *pRoot;
   
   /*
    * Case sensitivity flag.
@@ -50,18 +50,18 @@ struct SNDICT_TAG {
 };
 
 /*
- * The SNDICT_NODE structure.
+ * The RFDICT_NODE structure.
  * 
  * (Structure prototype given earlier.)
  */
-struct SNDICT_NODE_TAG {
+struct RFDICT_NODE_TAG {
   
   /*
    * Pointer to the parent of this node.
    * 
    * NULL if this node is the root node.
    */
-  SNDICT_NODE *pParent;
+  RFDICT_NODE *pParent;
   
   /*
    * Pointer to the left child node of this node.
@@ -71,7 +71,7 @@ struct SNDICT_NODE_TAG {
    * The left child node and all nodes in that subtree must have key
    * values that are less than the key value of this node.
    */
-  SNDICT_NODE *pLeft;
+  RFDICT_NODE *pLeft;
   
   /*
    * Pointer to the right child node of this node.
@@ -81,7 +81,7 @@ struct SNDICT_NODE_TAG {
    * The right child node and all nodes in that subtree must have key
    * values that are greater than the key value of this node.
    */
-  SNDICT_NODE *pRight;
+  RFDICT_NODE *pRight;
   
   /*
    * The value associated with this node.
@@ -136,7 +136,7 @@ struct SNDICT_NODE_TAG {
  * The character mapping table.
  * 
  * The character table has 256 character elements.  It is only valid if
- * snu_ctable_init is non-zero.  Otherwise, it has not been initialized
+ * rf_ctable_init is non-zero.  Otherwise, it has not been initialized
  * yet.
  * 
  * When it is initialized, it maps characters from the character set
@@ -154,19 +154,19 @@ struct SNDICT_NODE_TAG {
  * table.  If the value at the table is zero, the character has no ASCII
  * mapping.  Otherwise, it the character maps to the given ASCII value.
  */
-static char snu_ctable[256];
-static int  snu_ctable_init = 0;
+static char rf_ctable[256];
+static int  rf_ctable_init = 0;
 
 /* Function prototypes */
-static int sndict_keycmp(
+static int rfdict_keycmp(
     const char * pKey1,
     const char * pKey2,
     int          sensitive);
-static SNDICT_NODE *sndict_find(SNDICT *pDict, const char *pKey);
-static int sndict_isred(SNDICT_NODE *pNode);
-static int sndict_isblack(SNDICT_NODE *pNode);
-static void sndict_rol(SNDICT_NODE *pNode, SNDICT *pDict);
-static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict);
+static RFDICT_NODE *rfdict_find(RFDICT *pDict, const char *pKey);
+static int rfdict_isred(RFDICT_NODE *pNode);
+static int rfdict_isblack(RFDICT_NODE *pNode);
+static void rfdict_rol(RFDICT_NODE *pNode, RFDICT *pDict);
+static void rfdict_ror(RFDICT_NODE *pNode, RFDICT *pDict);
 
 /*
  * Perform a case-insensitive or case-sensitive string comparison.
@@ -194,7 +194,7 @@ static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict);
  *   less than zero, equal to zero, or greater than zero, as key1 is
  *   less than, equal to, or greater than key2
  */
-static int sndict_keycmp(
+static int rfdict_keycmp(
     const char * pKey1,
     const char * pKey2,
     int          sensitive) {
@@ -282,9 +282,9 @@ static int sndict_keycmp(
  *   the dictionary node matching the key, or NULL if no node matches
  *   the key
  */
-static SNDICT_NODE *sndict_find(SNDICT *pDict, const char *pKey) {
+static RFDICT_NODE *rfdict_find(RFDICT *pDict, const char *pKey) {
   
-  SNDICT_NODE *pCurrent = NULL;
+  RFDICT_NODE *pCurrent = NULL;
   int retval = 0;
   
   /* Check parameters */
@@ -299,7 +299,7 @@ static SNDICT_NODE *sndict_find(SNDICT *pDict, const char *pKey) {
   while (pCurrent != NULL) {
     
     /* Compare to current node */
-    retval = sndict_keycmp(
+    retval = rfdict_keycmp(
               pKey, &((pCurrent->key)[0]), pDict->sensitive);
     
     /* Done if equal, else go down appropriate branch */
@@ -338,7 +338,7 @@ static SNDICT_NODE *sndict_find(SNDICT *pDict, const char *pKey) {
  * 
  *   non-zero if the node exists and is red, zero otherwise
  */
-static int sndict_isred(SNDICT_NODE *pNode) {
+static int rfdict_isred(RFDICT_NODE *pNode) {
   
   int result = 0;
   
@@ -371,7 +371,7 @@ static int sndict_isred(SNDICT_NODE *pNode) {
  *   non-zero if the node does not exist or it exists and is black, zero
  *   otherwise
  */
-static int sndict_isblack(SNDICT_NODE *pNode) {
+static int rfdict_isblack(RFDICT_NODE *pNode) {
   
   int result = 0;
   
@@ -408,9 +408,9 @@ static int sndict_isblack(SNDICT_NODE *pNode) {
  * 
  *   pDict - the dictionary
  */
-static void sndict_rol(SNDICT_NODE *pNode, SNDICT *pDict) {
+static void rfdict_rol(RFDICT_NODE *pNode, RFDICT *pDict) {
   
-  SNDICT_NODE *pR = NULL;
+  RFDICT_NODE *pR = NULL;
   
   /* Check parameter */
   if ((pNode == NULL) || (pDict == NULL)) {
@@ -474,9 +474,9 @@ static void sndict_rol(SNDICT_NODE *pNode, SNDICT *pDict) {
  * 
  *   pDict - the dictionary
  */
-static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict) {
+static void rfdict_ror(RFDICT_NODE *pNode, RFDICT *pDict) {
   
-  SNDICT_NODE *pL = NULL;
+  RFDICT_NODE *pL = NULL;
   
   /* Check parameters */
   if ((pNode == NULL) || (pDict == NULL)) {
@@ -529,9 +529,9 @@ static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict) {
  */
 
 /*
- * snu_ctable_prepare function.
+ * rf_ctable_prepare function.
  */
-void snu_ctable_prepare(void) {
+void rf_ctable_prepare(void) {
   
   /* ASCII characters from 0x20 to 0x7E, represented in the character
    * set used in C source files */
@@ -546,10 +546,10 @@ void snu_ctable_prepare(void) {
   int source_c = 0;
   
   /* Only do something if not yet initialized */
-  if (!snu_ctable_init) {
+  if (!rf_ctable_init) {
     
     /* Clear the table to zero */
-    memset(&(snu_ctable[0]), 0, 256);
+    memset(&(rf_ctable[0]), 0, 256);
     
     /* Map all characters in char_ref */
     for(ascii_c = 0x20; ascii_c <= 0x7E; ascii_c++) {
@@ -570,23 +570,23 @@ void snu_ctable_prepare(void) {
       }
       
       /* Table entry for the source value shouldn't be set yet */
-      if (snu_ctable[source_c] != 0) {
+      if (rf_ctable[source_c] != 0) {
         abort();
       }
       
       /* Set the record in the mapping table */
-      snu_ctable[source_c] = (char) ascii_c;
+      rf_ctable[source_c] = (char) ascii_c;
     }
     
     /* Set the initialization flag */
-    snu_ctable_init = 1;
+    rf_ctable_init = 1;
   }
 }
 
 /*
- * snu_ctable_ascii function.
+ * rf_ctable_ascii function.
  */
-int snu_ctable_ascii(int source_c) {
+int rf_ctable_ascii(int source_c) {
   
   int ascii_c = 0;
   
@@ -596,7 +596,7 @@ int snu_ctable_ascii(int source_c) {
   }
   
   /* Initialize table if not already initialized */
-  snu_ctable_prepare();
+  rf_ctable_prepare();
   
   /* If source_c is negative, add 256 to make it positive */
   if (source_c < 0) {
@@ -604,7 +604,7 @@ int snu_ctable_ascii(int source_c) {
   }
   
   /* Look up the equivalent ASCII code */
-  ascii_c = snu_ctable[source_c];
+  ascii_c = rf_ctable[source_c];
   
   /* Fault if not recognized */
   if (ascii_c == 0) {
@@ -616,18 +616,18 @@ int snu_ctable_ascii(int source_c) {
 }
 
 /*
- * sndict_alloc function.
+ * rfdict_alloc function.
  */
-SNDICT *sndict_alloc(int sensitive) {
+RFDICT *rfdict_alloc(int sensitive) {
   
-  SNDICT *pDict = NULL;
+  RFDICT *pDict = NULL;
   
   /* Allocate dictionary structure and clear it */
-  pDict = (SNDICT *) malloc(sizeof(SNDICT));
+  pDict = (RFDICT *) malloc(sizeof(RFDICT));
   if (pDict == NULL) {
     abort();
   }
-  memset(pDict, 0, sizeof(SNDICT));
+  memset(pDict, 0, sizeof(RFDICT));
   
   /* Initialize the dictionary */
   pDict->pRoot = NULL;
@@ -638,12 +638,12 @@ SNDICT *sndict_alloc(int sensitive) {
 }
 
 /*
- * sndict_free function.
+ * rfdict_free function.
  */
-void sndict_free(SNDICT *pDict) {
+void rfdict_free(RFDICT *pDict) {
   
-  SNDICT_NODE *pNode = NULL;
-  SNDICT_NODE *pParent = NULL;
+  RFDICT_NODE *pNode = NULL;
+  RFDICT_NODE *pParent = NULL;
   
   /* Only perform operation if point is non-NULL */
   if (pDict != NULL) {
@@ -698,19 +698,19 @@ void sndict_free(SNDICT *pDict) {
 }
 
 /*
- * sndict_insert function.
+ * rfdict_insert function.
  */
-int sndict_insert(
-    SNDICT     * pDict,
+int rfdict_insert(
+    RFDICT     * pDict,
     const char * pKey,
     long         val,
     int          translate) {
   
   size_t slen = 0;
-  SNDICT_NODE *pNode = NULL;
-  SNDICT_NODE *pCurrent = NULL;
-  SNDICT_NODE *pParent = NULL;
-  SNDICT_NODE *pGrand = NULL;
+  RFDICT_NODE *pNode = NULL;
+  RFDICT_NODE *pCurrent = NULL;
+  RFDICT_NODE *pParent = NULL;
+  RFDICT_NODE *pGrand = NULL;
   char *pc = NULL;
   int status = 1;
   int retval = 0;
@@ -724,16 +724,16 @@ int sndict_insert(
   slen = strlen(pKey);
   
   /* Make sure key size isn't too large */
-  if (slen > SNDICT_MAXKEY) {
+  if (slen > RFDICT_MAXKEY) {
     abort();
   }
   
   /* Allocate a new node */
-  pNode = (SNDICT_NODE *) malloc(sizeof(SNDICT_NODE) + slen);
+  pNode = (RFDICT_NODE *) malloc(sizeof(RFDICT_NODE) + slen);
   if (pNode == NULL) {
     abort();
   }
-  memset(pNode, 0, sizeof(SNDICT_NODE) + slen);
+  memset(pNode, 0, sizeof(RFDICT_NODE) + slen);
   
   /* Initialize node */
   pNode->pParent = NULL;
@@ -746,7 +746,7 @@ int sndict_insert(
   /* If translation was requested, perform translation */
   if (translate) {
     for(pc = &((pNode->key)[0]); *pc != 0; pc++) {
-      *pc = (char) snu_ctable_ascii(*pc);
+      *pc = (char) rf_ctable_ascii(*pc);
     }
   }
   
@@ -844,7 +844,7 @@ int sndict_insert(
    * root node, in which case color it black and no further rebalancing.
    */
   if (status) {
-    if (sndict_isred(pNode) && sndict_isred(pNode->pParent)) {
+    if (rfdict_isred(pNode) && rfdict_isred(pNode->pParent)) {
       
       /* Get the grandparent node, which much exist */
       pGrand = (pNode->pParent)->pParent;
@@ -853,8 +853,8 @@ int sndict_insert(
       }
       
       /* Rebalance while both of grandparent's children are red */
-      while(sndict_isred(pGrand->pLeft) &&
-            sndict_isred(pGrand->pRight)) {
+      while(rfdict_isred(pGrand->pLeft) &&
+            rfdict_isred(pGrand->pRight)) {
         
         /* Set grandparent's children to black color */
         (pGrand->pLeft)->red = 0;
@@ -874,7 +874,7 @@ int sndict_insert(
         /* If new node is red and its parent is red, update grandparent
          * and continue rebalancing loop; else, done with this
          * rebalancing step */
-        if (sndict_isred(pNode) && sndict_isred(pNode->pParent)) {
+        if (rfdict_isred(pNode) && rfdict_isred(pNode->pParent)) {
           pGrand = (pNode->pParent)->pParent;
           if (pGrand == NULL) {
             abort();
@@ -900,7 +900,7 @@ int sndict_insert(
    * violation of the red node rules to fix.
    */
   if (status) {
-    if (sndict_isred(pNode) && sndict_isred(pNode->pParent)) {
+    if (rfdict_isred(pNode) && rfdict_isred(pNode->pParent)) {
       
       /* Get the grandparent node, which much exist */
       pGrand = (pNode->pParent)->pParent;
@@ -910,8 +910,8 @@ int sndict_insert(
       
       /* Rebalance if one of the grandparent's children is black or
        * missing */
-      if (sndict_isblack(pGrand->pLeft) ||
-          sndict_isblack(pGrand->pRight)) {
+      if (rfdict_isblack(pGrand->pLeft) ||
+          rfdict_isblack(pGrand->pRight)) {
         
         /* Get parent node */
         pParent = pNode->pParent;
@@ -922,8 +922,8 @@ int sndict_insert(
            * of grandparent */
           pNode->red = 0;
           pGrand->red = 1;
-          sndict_rol(pParent, pDict);
-          sndict_ror(pGrand, pDict);
+          rfdict_rol(pParent, pDict);
+          rfdict_ror(pGrand, pDict);
           
         } else if ((pNode == pParent->pLeft) &&
                     (pParent == pGrand->pRight)) {
@@ -931,8 +931,8 @@ int sndict_insert(
            * of grandparent */
           pNode->red = 0;
           pGrand->red = 1;
-          sndict_ror(pParent, pDict);
-          sndict_rol(pGrand, pDict);
+          rfdict_ror(pParent, pDict);
+          rfdict_rol(pGrand, pDict);
           
         } else if ((pNode == pParent->pLeft) &&
                     (pParent == pGrand->pLeft)) {
@@ -940,7 +940,7 @@ int sndict_insert(
              * of grandparent */
             pParent->red = 0;
             pGrand->red = 1;
-            sndict_ror(pGrand, pDict);
+            rfdict_ror(pGrand, pDict);
             
         } else if ((pNode == pParent->pRight) &&
                     (pParent == pGrand->pRight)) {
@@ -948,7 +948,7 @@ int sndict_insert(
              * child of grandparent */
             pParent->red = 0;
             pGrand->red = 1;
-            sndict_rol(pGrand, pDict);
+            rfdict_rol(pGrand, pDict);
             
         } else {
           abort();  /* shouldn't happen */
@@ -963,11 +963,11 @@ int sndict_insert(
 }
 
 /*
- * sndict_get function.
+ * rfdict_get function.
  */
-long sndict_get(SNDICT *pDict, const char *pKey, long dvalue) {
+long rfdict_get(RFDICT *pDict, const char *pKey, long dvalue) {
 
-  SNDICT_NODE *pNode = NULL;
+  RFDICT_NODE *pNode = NULL;
   long result = 0;
   
   /* Check parameters */
@@ -976,7 +976,7 @@ long sndict_get(SNDICT *pDict, const char *pKey, long dvalue) {
   }
   
   /* Search for the node */
-  pNode = sndict_find(pDict, pKey);
+  pNode = rfdict_find(pDict, pKey);
   
   /* If node found, take value from that; else, use dvalue */
   if (pNode != NULL) {

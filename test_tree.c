@@ -1,18 +1,18 @@
 /*
  * test_tree.c
  * 
- * Test program for the dictionary of shastina_util.
+ * Test program for the dictionary of rfdict.
  * 
  * This tests the tree using internal interfaces of the module.
  * 
  * Compilation:
  * 
- *   - The source file of shastina_util is included by this file, so
- *     just compile this file by itself.  Do NOT separately specify
- *     shastina_util.c, because that's already included here.
+ *   - The source file of rfdict is included by this file, so just
+ *     compile this file by itself.  Do NOT separately specify rfdict.c,
+ *     because that's already included here.
  */
 
-#include "shastina_util.c"  /* The source file, not the header! */
+#include "rfdict.c"   /* The source file, not the header! */
 
 #include <limits.h>
 #include <stddef.h>
@@ -71,8 +71,8 @@
  *   non-zero if subtree verified, zero if verification failed
  */
 int verify_tree(
-    SNDICT_NODE *pNode,
-    SNDICT_NODE *pParent,
+    RFDICT_NODE *pNode,
+    RFDICT_NODE *pParent,
     int black_depth,
     int *pexit_depth) {
   
@@ -203,7 +203,7 @@ int verify_tree(
 /*
  * @@TODO:
  */
-void print_tree(SNDICT_NODE *pNode, int depth, FILE *pOut) {
+void print_tree(RFDICT_NODE *pNode, int depth, FILE *pOut) {
   
   int i = 0;
   
@@ -240,7 +240,7 @@ void print_tree(SNDICT_NODE *pNode, int depth, FILE *pOut) {
  */
 int main(int argc, char *argv[]) {
   
-  SNDICT *pDict = NULL;
+  RFDICT *pDict = NULL;
   char buf[INPUT_MAXLINE];
   int status = 1;
   int x = 0;
@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
   memset(&(buf[0]), 0, INPUT_MAXLINE);
   
   /* Allocate case-insensitive dictionary */
-  pDict = sndict_alloc(0);
+  pDict = rfdict_alloc(0);
   
   /* Read each line of input */
   while (fgets(&(buf[0]), INPUT_MAXLINE, stdin) != NULL) {
@@ -299,7 +299,7 @@ int main(int argc, char *argv[]) {
     /* Insert trimmed string as key, with line number as value, unless
      * trimmed length is zero, in which case line is blank */
     if (status && (strlen(&(buf[x])) > 0)) {
-      if (!sndict_insert(pDict, &(buf[x]), line, 0)) {
+      if (!rfdict_insert(pDict, &(buf[x]), line, 0)) {
         fprintf(stderr, "Duplicate key!  Line %d\n", line);
         status = 0;
       }
@@ -350,7 +350,7 @@ int main(int argc, char *argv[]) {
   }
   
   /* Free dictionary */
-  sndict_free(pDict);
+  rfdict_free(pDict);
   pDict = NULL;
   
   /* Return inverted status */

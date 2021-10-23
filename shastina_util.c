@@ -585,6 +585,37 @@ int sndict_insert(
 /*
  * @@TODO:
  */
+void print_tree(SNDICT_NODE *pNode, int depth) {
+  
+  int i = 0;
+  
+  /* Check parameter */
+  if ((pNode == NULL) || (depth < 0) || (depth >= INT_MAX)) {
+    abort();
+  }
+  
+  /* If there is a left subtree, recursively print it */
+  if (pNode->pLeft != NULL) {
+    print_tree(pNode->pLeft, depth + 1);
+  }
+  
+  /* Print a number of spaces equal to the depth */
+  for(i = 0; i < depth; i++) {
+    putchar(0x20);
+  }
+  
+  /* Print the current key */
+  printf("%s\n", &((pNode->key)[0]));
+  
+  /* If there is a right subtree, recursively print it */
+  if (pNode->pRight != NULL) {
+    print_tree(pNode->pRight, depth + 1);
+  }
+}
+
+/*
+ * @@TODO:
+ */
 int main(int argc, char *argv[]) {
   
   SNDICT *pDict = NULL;
@@ -599,14 +630,17 @@ int main(int argc, char *argv[]) {
   if (!sndict_insert(pDict, "Apple", 1, 1)) {
     abort();
   }
-  if (!sndict_insert(pDict, "Cherry", 3, 1)) {
-    abort();
-  }
   if (!sndict_insert(pDict, "Orange", 4, 1)) {
     abort();
   }
+  if (!sndict_insert(pDict, "Cherry", 3, 1)) {
+    abort();
+  }
   
-  /* @@TODO: */
+  /* Print the tree */
+  if (pDict->pRoot != NULL) {
+    print_tree(pDict->pRoot, 0);
+  }
   
   /* Free dictionary */
   sndict_free(pDict);

@@ -23,51 +23,6 @@ typedef struct RFDICT_TAG RFDICT;
 #define RFDICT_MAXKEY (16384)
 
 /*
- * Initialize the character mapping table if not already initialized.
- * 
- * This call is ignored if the character mapping table is already
- * initialized.
- * 
- * This function will be called automatically when character mapping is
- * used.  However, if there is any multithreading going on, this
- * function should be explicitly called at the start of the program, to
- * avoid the situation of two threads trying to initialize the character
- * mapping table at the same time.
- * 
- * This function is not thread safe, unless the table has already been
- * initialized.
- */
-void rf_ctable_prepare(void);
-
-/*
- * Map a character from the character set used in C source files to the
- * US-ASCII character set.
- * 
- * For example, rf_ctable_ascii('a') will return 0x61 (the US-ASCII
- * code for a lowercase a), even if ((int) 'a') actually is something
- * else according to the character set used in C source files.
- * 
- * The only characters supported by this mapping function are the
- * visible US-ASCII characters and the space character (US-ASCII range
- * 0x20-0x7e).  A fault occurs if any other character is passed.
- * 
- * This function is not thread safe, unless the character mapping table
- * has already been initialized with rf_ctable_prepare().  If thread
- * safe operation is required, call rf_ctable_prepare() explicitly at
- * the start of the program.  Otherwise, it will be called implicitly on
- * the first call to this function.
- * 
- * Parameters:
- * 
- *   source_c - a character in the character set used in C source files
- * 
- * Return:
- * 
- *   the US-ASCII equivalent of this character
- */
-int rf_ctable_ascii(int source_c);
-
-/*
  * Allocate a new dictionary object.
  * 
  * The dictionary starts out empty.  If sensitive is non-zero, key
@@ -106,25 +61,17 @@ void rfdict_free(RFDICT *pDict);
  * pKey points to the key to insert.  This must be a null-terminated
  * string, which may be empty.  The key may not be equal to any key that
  * is already in the dictionary, or the function will fail.  If the
- * dictionary was created as case-insensitive, then keys must be exactly
- * the same to match.  If the dictionary was created as case-sensitive,
- * uppercase characters A-Z are treated as equivalent to lowercase
- * letters a-z, but otherwise keys must be exactly the same to match.
- * The key string may contain characters of any value (except for zero,
- * which is used as the terminating null character).
+ * dictionary was created as case-sensitive, then keys must be exactly
+ * the same to match.  If the dictionary was created as
+ * case-insensitive, uppercase characters A-Z are treated as equivalent
+ * to lowercase letters a-z, but otherwise keys must be exactly the same
+ * to match.  The key string may contain characters of any value (except
+ * for zero, which is used as the terminating null character).
  * 
  * The length of the key may not exceed RFDICT_MAXKEY or a fault occurs.
  * 
  * val is the value to associate with the given key.  This may have any
  * long value.
- * 
- * If the translate flag is zero, then the key string is used as-is, and
- * may contain bytes of any value, as described above.  If the translate
- * flag is non-zero, each character in the key string will be translated
- * through rf_ctable_ascii() before being stored in the dictionary (see
- * that function for further information).  If the translate flag is
- * set, then each character in the string must be translateable by
- * rf_ctable_ascii() or a fault will occur.
  * 
  * This function returns whether it succeeded.  If the function fails,
  * then the dictionary is unmodified.  Otherwise, the key/value pair is
@@ -138,8 +85,6 @@ void rfdict_free(RFDICT *pDict);
  * 
  *   val - the value to associate with the key
  * 
- *   translate - non-zero for character translation, zero otherwise
- * 
  * Return:
  * 
  *   non-zero if successful, zero if function failed because key was
@@ -148,16 +93,14 @@ void rfdict_free(RFDICT *pDict);
 int rfdict_insert(
     RFDICT     * pDict,
     const char * pKey,
-    long         val,
-    int          translate);
+    long         val);
 
 /*
  * Get the value associated with a given key in a dictionary.
  * 
  * pDict is the dictionary to query.
  * 
- * pKey is the null-terminated key to check for.  No character
- * translation is performed on the key.  Comparisons will be
+ * pKey is the null-terminated key to check for.  Comparisons will be
  * case-sensitive or case-insensitive depending on the dictionary
  * setting.
  * 

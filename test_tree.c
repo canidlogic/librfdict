@@ -5,6 +5,10 @@
  * 
  * This tests the tree using internal interfaces of the module.
  * 
+ * A word list with the same format as for test_dict.c is read from
+ * standard input.  The tree is verified and printed to standard output.
+ * The dictionary is constructed in case-insensitive mode.
+ * 
  * Compilation:
  * 
  *   - The source file of rfdict is included by this file, so just
@@ -201,7 +205,15 @@ int verify_tree(
 }
 
 /*
- * @@TODO:
+ * Recursively print the tree.
+ * 
+ * Parameters:
+ * 
+ *   pNode - the root node to print
+ * 
+ *   depth - the recursive depth; pass zero at the root note
+ * 
+ *   pOut - the file to print the tree to (fully sequential)
  */
 void print_tree(RFDICT_NODE *pNode, int depth, FILE *pOut) {
   
@@ -236,7 +248,7 @@ void print_tree(RFDICT_NODE *pNode, int depth, FILE *pOut) {
 }
 
 /*
- * @@TODO:
+ * Program entrypoint.
  */
 int main(int argc, char *argv[]) {
   
@@ -299,7 +311,7 @@ int main(int argc, char *argv[]) {
     /* Insert trimmed string as key, with line number as value, unless
      * trimmed length is zero, in which case line is blank */
     if (status && (strlen(&(buf[x])) > 0)) {
-      if (!rfdict_insert(pDict, &(buf[x]), line, 0)) {
+      if (!rfdict_insert(pDict, &(buf[x]), line)) {
         fprintf(stderr, "Duplicate key!  Line %d\n", line);
         status = 0;
       }

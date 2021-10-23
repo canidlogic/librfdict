@@ -18,6 +18,23 @@ struct SNDICT_NODE_TAG;
 typedef struct SNDICT_NODE_TAG SNDICT_NODE;
 
 /*
+ * The maximum length of a dictionary key in bytes, not including the
+ * terminating null.
+ * 
+ * This value plus the size of the SNDICT_NODE structure must not exceed
+ * the maximum value of a size_t, or undefined behavior occurs.
+ */
+#define SNDICT_MAXKEY (16384)
+
+/*
+ * ASCII constants.
+ */
+#define ASCII_UPPER_A (0x41)    /* A */
+#define ASCII_UPPER_Z (0x5a)    /* Z */
+#define ASCII_LOWER_A (0x61)    /* a */
+#define ASCII_LOWER_Z (0x7a)    /* z */
+
+/*
  * The SNDICT structure.
  * 
  * (Structure prototype given earlier.)
@@ -386,6 +403,182 @@ void sndict_free(SNDICT *pDict) {
   }
 }
 
+/*
+ * Insert a new key/value pair into a given dictionary.
+ * 
+ * pDict is the dictionary to insert the key into.
+ * 
+ * pKey points to the key to insert.  This must be a null-terminated
+ * string, which may be empty.  The key may not be equal to any key that
+ * is already in the dictionary, or the function will fail.  If the
+ * dictionary was created as case-insensitive, then keys must be exactly
+ * the same to match.  If the dictionary was created as case-sensitive,
+ * uppercase characters A-Z are treated as equivalent to lowercase
+ * letters a-z, but otherwise keys must be exactly the same to match.
+ * The key string may contain characters of any value (except for zero,
+ * which is used as the terminating null character).
+ * 
+ * The length of the key may not exceed SNDICT_MAXKEY or a fault occurs.
+ * 
+ * val is the value to associate with the given key.  This may have any
+ * long value.
+ * 
+ * If the translate flag is zero, then the key string is used as-is, and
+ * may contain bytes of any value, as described above.  If the translate
+ * flag is non-zero, each character in the key string will be translated
+ * through snu_ctable_ascii() before being stored in the dictionary (see
+ * that function for further information).  If the translate flag is
+ * set, then each character in the string must be translateable by
+ * snu_ctable_ascii() or a fault will occur.
+ * 
+ * This function returns whether it succeeded.  If the function fails,
+ * then the dictionary is unmodified.  Otherwise, the key/value pair is
+ * inserted successfully.
+ * 
+ * Parameters:
+ * 
+ *   pDict - the dictionary object
+ * 
+ *   pKey - the key string
+ * 
+ *   val - the value to associate with the key
+ * 
+ *   translate - non-zero for character translation, zero otherwise
+ * 
+ * Return:
+ * 
+ *   non-zero if successful, zero if function failed because key was
+ *   already present in the dictionary
+ */
+int sndict_insert(
+    SNDICT     * pDict,
+    const char * pKey,
+    long         val,
+    int          translate) {
+  
+  size_t slen = 0;
+  SNDICT_NODE *pNode = NULL;
+  SNDICT_NODE *pCurrent = NULL;
+  char *pc = NULL;
+  int status = 1;
+  int retval = 0;
+  
+  /* Check parameters */
+  if ((pDict == NULL) || (pKey == NULL)) {
+    abort();
+  }
+  
+  /* Get size of string, not including terminating null */
+  slen = strlen(pKey);
+  
+  /* Make sure key size isn't too large */
+  if (slen > SNDICT_MAXKEY) {
+    abort();
+  }
+  
+  /* Allocate a new node */
+  pNode = (SNDICT_NODE *) malloc(sizeof(SNDICT_NODE) + slen);
+  if (pNode == NULL) {
+    abort();
+  }
+  memset(pNode, 0, sizeof(SNDICT_NODE) + slen);
+  
+  /* Initialize node */
+  pNode->pParent = NULL;
+  pNode->pLeft = NULL;
+  pNode->pRight = NULL;
+  pNode->val = val;
+  pNode->red = 0;
+  strcpy(&((pNode->key)[0]), pKey);
+  
+  /* If translation was requested, perform translation */
+  if (translate) {
+    for(pc = &((pNode->key)[0]); *pc != 0; pc++) {
+      *pc = (char) snu_ctable_ascii(*pc);
+    }
+  }
+  
+  /* If dictionary is case-insensitive, map lowercase letters to
+   * uppercase */
+  if (pDict->sensitive == 0) {
+    for(pc = &((pNode->key)[0]); *pc != 0; pc++) {
+      if ((*pc >= ASCII_LOWER_A) && (*pc <= ASCII_LOWER_Z)) {
+        *pc = *pc - (ASCII_LOWER_A - ASCII_UPPER_A);
+      }
+    }
+  }
+  
+  /* We now have to insert the new node into the search tree */
+  if (pDict->pRoot == NULL) {
+    
+    /* Search tree is currently empty, so set the color of the node to
+     * black and set it as the root node */
+    pDict->pRoot = pNode;
+    pNode->pParent = NULL;
+    pNode->red = 0;
+    
+  } else {
+    /* Search tree is not empty, so we need to find the appropriate
+     * position */
+    pCurrent = pDict->pRoot;
+    for(retval = strcmp(&((pCurrent->key)[0]), &((pNode->key)[0]));
+        retval != 0;
+        retval = strcmp(&((pCurrent->key)[0]), &((pNode->key)[0]))) {
+      
+      /* We are done if current node is greater than new node and the
+       * left branch of current node is empty, or if current node is
+       * less than new node and the right branch of current node is
+       * empty; otherwise, proceed down the appropriate branch */
+      if (((pCurrent->pLeft == NULL) && (retval > 0)) ||
+          ((pCurrent->pRight == NULL) && (retval < 0))) {
+        /* Done */
+        break;
+      
+      } else {
+        /* Not done yet -- proceed down appropriate branch */
+        if (retval > 0) {
+          pCurrent = pCurrent->pLeft;
+        
+        } else if (retval < 0) {
+          pCurrent = pCurrent->pRight;
+          
+        } else {
+          abort();  /* shouldn't happen */
+        }
+      }
+    }
+    
+    /* Insert the new node into the search tree, or free the new node
+     * and set error status if a duplicate key already exists in the
+     * tree */
+    if (retval > 0) {
+      /* Set the node in the left branch of current, and set color to
+       * red */
+      pCurrent->pLeft = pNode;
+      pNode->pParent = pCurrent;
+      pNode->red = 1;
+    
+    } else if (retval < 0) {
+      /* Set the node in the right branch of current, and set color to
+       * red */
+      pCurrent->pRight = pNode;
+      pNode->pParent = pCurrent;
+      pNode->red = 1;
+    
+    } else {
+      /* Duplicate key error -- set error status and free node new */
+      status = 0;
+      free(pNode);
+      pNode = NULL;
+    }
+  }
+  
+  /* @@TODO: red-black rebalancing*/
+  
+  /* Return status */
+  return status;
+}
+
 /* @@TODO: */
 #include <stdio.h>
 
@@ -394,17 +587,31 @@ void sndict_free(SNDICT *pDict) {
  */
 int main(int argc, char *argv[]) {
   
-  static char msg[] = "Hello, world!";
-  char *pc = NULL;
+  SNDICT *pDict = NULL;
   
-  printf("\"Hello, world!\" is US-ASCII is:\n");
-  for(pc = &(msg[0]); *pc != 0; pc++) {
-    if (pc != &(msg[0])) {
-      printf(" ");
-    }
-    printf("%02x", snu_ctable_ascii(*pc));
+  /* Allocate case-insensitive dictionary */
+  pDict = sndict_alloc(0);
+  
+  /* Insert elements */
+  if (!sndict_insert(pDict, "Banana", 2, 1)) {
+    abort();
   }
-  printf("\n");
+  if (!sndict_insert(pDict, "Apple", 1, 1)) {
+    abort();
+  }
+  if (!sndict_insert(pDict, "Cherry", 3, 1)) {
+    abort();
+  }
+  if (!sndict_insert(pDict, "Orange", 4, 1)) {
+    abort();
+  }
   
+  /* @@TODO: */
+  
+  /* Free dictionary */
+  sndict_free(pDict);
+  pDict = NULL;
+  
+  /* Return successfully */
   return 0;
 }

@@ -1,7 +1,7 @@
 /*
  * test_dict.c
  * 
- * Test program for the dictionary of shastina_util.
+ * Test program for the dictionary of rfdict.
  * 
  * This tests the dictionary using the external interface of the module.
  * 
@@ -28,10 +28,10 @@
  * 
  * Compilation:
  * 
- *   - Compile with shastina_util.c
+ *   - Compile with rfdict.c
  */
 
-#include "shastina_util.h"
+#include "rfdict.h"
 
 #include <limits.h>
 #include <stddef.h>
@@ -46,7 +46,7 @@
  */
 int main(int argc, char *argv[]) {
   
-  SNDICT *pDict = NULL;
+  RFDICT *pDict = NULL;
   char buf[INPUT_MAXLINE];
   int status = 1;
   int x = 0;
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
   
   /* Allocate dictionary */
   if (status) {
-    pDict = sndict_alloc(sensitive);
+    pDict = rfdict_alloc(sensitive);
   }
   
   /* Read each line of input */
@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
     /* Insert trimmed string as key, with line number as value, unless
      * trimmed length is zero, in which case line is blank */
     if (status && (strlen(&(buf[x])) > 0)) {
-      if (!sndict_insert(pDict, &(buf[x]), line, 0)) {
+      if (!rfdict_insert(pDict, &(buf[x]), line, 0)) {
         fprintf(stderr, "Duplicate key!  Line %d\n", line);
         status = 0;
       }
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
   /* Convert key to ASCII */
   if (status) {
     for(x = 0; buf[x] != 0; x++) {
-      buf[x] = snu_ctable_ascii(buf[x]);
+      buf[x] = rf_ctable_ascii(buf[x]);
     }
   }
   
@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
   
   /* Find the key in the dictionary, returning -1 if not found */
   if (status) {
-    result = sndict_get(pDict, &(buf[x]), -1);
+    result = rfdict_get(pDict, &(buf[x]), -1);
   }
   
   /* Report result */
@@ -217,7 +217,7 @@ int main(int argc, char *argv[]) {
   }
   
   /* Free dictionary if allocated */
-  sndict_free(pDict);
+  rfdict_free(pDict);
   pDict = NULL;
   
   /* Return inverted status */

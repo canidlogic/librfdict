@@ -1,30 +1,14 @@
 /*
  * shastina_util.c
  * 
- * Utility module for Shastina.  This is completely separate from the
- * main Shastina module, but it has auxiliary functions that are useful.
+ * Implementation of shastina_util.h
+ * 
+ * See the header for further information.
  */
 
-#include <limits.h>
-#include <stddef.h>
+#include "shastina_util.h"
 #include <stdlib.h>
 #include <string.h>
-
-/* Structure prototypes */
-struct SNDICT_TAG;
-typedef struct SNDICT_TAG SNDICT;
-
-struct SNDICT_NODE_TAG;
-typedef struct SNDICT_NODE_TAG SNDICT_NODE;
-
-/*
- * The maximum length of a dictionary key in bytes, not including the
- * terminating null.
- * 
- * This value plus the size of the SNDICT_NODE structure must not exceed
- * the maximum value of a size_t, or undefined behavior occurs.
- */
-#define SNDICT_MAXKEY (16384)
 
 /*
  * ASCII constants.
@@ -34,11 +18,14 @@ typedef struct SNDICT_NODE_TAG SNDICT_NODE;
 #define ASCII_LOWER_A (0x61)    /* a */
 #define ASCII_LOWER_Z (0x7a)    /* z */
 
+/* Structure prototypes */
+struct SNDICT_NODE_TAG;
+typedef struct SNDICT_NODE_TAG SNDICT_NODE;
+
 /*
  * The SNDICT structure.
  * 
- * (Structure prototype given earlier.)
- * @@TODO: change above to header
+ * Structure prototype defined in the header.
  * 
  * Use the sndict_ functions to manipulate this structure.
  */
@@ -66,7 +53,6 @@ struct SNDICT_TAG {
  * The SNDICT_NODE structure.
  * 
  * (Structure prototype given earlier.)
- * @@TODO: change above to header
  */
 struct SNDICT_NODE_TAG {
   
@@ -377,22 +363,12 @@ static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict) {
 /* 
  * Public functions
  * ================
+ * 
+ * See the header for specifications.
  */
 
 /*
- * Initialize the character mapping table if not already initialized.
- * 
- * This call is ignored if the character mapping table is already
- * initialized.
- * 
- * This function will be called automatically when character mapping is
- * used.  However, if there is any multithreading going on, this
- * function should be explicitly called at the start of the program, to
- * avoid the situation of two threads trying to initialize the character
- * mapping table at the same time.
- * 
- * This function is not thread safe, unless the table has already been
- * initialized.
+ * snu_ctable_prepare function.
  */
 void snu_ctable_prepare(void) {
   
@@ -447,30 +423,7 @@ void snu_ctable_prepare(void) {
 }
 
 /*
- * Map a character from the character set used in C source files to the
- * US-ASCII character set.
- * 
- * For example, snu_ctable_ascii('a') will return 0x61 (the US-ASCII
- * code for a lowercase a), even if ((int) 'a') actually is something
- * else according to the character set used in C source files.
- * 
- * The only characters supported by this mapping function are the
- * visible US-ASCII characters and the space character (US-ASCII range
- * 0x20-0x7e).  A fault occurs if any other character is passed.
- * 
- * This function is not thread safe, unless the character mapping table
- * has already been initialized with snu_ctable_prepare().  If thread
- * safe operation is required, call snu_ctable_prepare() explicitly at
- * the start of the program.  Otherwise, it will be called implicitly on
- * the first call to this function.
- * 
- * Parameters:
- * 
- *   source_c - a character in the character set used in C source files
- * 
- * Return:
- * 
- *   the US-ASCII equivalent of this character
+ * snu_ctable_ascii function.
  */
 int snu_ctable_ascii(int source_c) {
   
@@ -502,22 +455,7 @@ int snu_ctable_ascii(int source_c) {
 }
 
 /*
- * Allocate a new dictionary object.
- * 
- * The dictionary starts out empty.  If sensitive is non-zero, key
- * comparisons will be case-sensitive.  Otherwise, key comparisons will
- * be case-insensitive.
- * 
- * Dictionaries must be freed with sndict_free().
- * 
- * Parameters:
- * 
- *   sensitive - non-zero for case-sensitive comparisons, zero for
- *   case-insensitive comparisons
- * 
- * Return:
- * 
- *   a new dictionary
+ * sndict_alloc function.
  */
 SNDICT *sndict_alloc(int sensitive) {
   
@@ -539,13 +477,7 @@ SNDICT *sndict_alloc(int sensitive) {
 }
 
 /*
- * Free a dictionary object.
- * 
- * The call is ignored if the passed pointer is NULL.
- * 
- * Parameters:
- * 
- *   pDict - the dictionary to free
+ * sndict_free function.
  */
 void sndict_free(SNDICT *pDict) {
   
@@ -605,51 +537,7 @@ void sndict_free(SNDICT *pDict) {
 }
 
 /*
- * Insert a new key/value pair into a given dictionary.
- * 
- * pDict is the dictionary to insert the key into.
- * 
- * pKey points to the key to insert.  This must be a null-terminated
- * string, which may be empty.  The key may not be equal to any key that
- * is already in the dictionary, or the function will fail.  If the
- * dictionary was created as case-insensitive, then keys must be exactly
- * the same to match.  If the dictionary was created as case-sensitive,
- * uppercase characters A-Z are treated as equivalent to lowercase
- * letters a-z, but otherwise keys must be exactly the same to match.
- * The key string may contain characters of any value (except for zero,
- * which is used as the terminating null character).
- * 
- * The length of the key may not exceed SNDICT_MAXKEY or a fault occurs.
- * 
- * val is the value to associate with the given key.  This may have any
- * long value.
- * 
- * If the translate flag is zero, then the key string is used as-is, and
- * may contain bytes of any value, as described above.  If the translate
- * flag is non-zero, each character in the key string will be translated
- * through snu_ctable_ascii() before being stored in the dictionary (see
- * that function for further information).  If the translate flag is
- * set, then each character in the string must be translateable by
- * snu_ctable_ascii() or a fault will occur.
- * 
- * This function returns whether it succeeded.  If the function fails,
- * then the dictionary is unmodified.  Otherwise, the key/value pair is
- * inserted successfully.
- * 
- * Parameters:
- * 
- *   pDict - the dictionary object
- * 
- *   pKey - the key string
- * 
- *   val - the value to associate with the key
- * 
- *   translate - non-zero for character translation, zero otherwise
- * 
- * Return:
- * 
- *   non-zero if successful, zero if function failed because key was
- *   already present in the dictionary
+ * sndict_insert function.
  */
 int sndict_insert(
     SNDICT     * pDict,
@@ -910,145 +798,5 @@ int sndict_insert(
   }
   
   /* Return status */
-  return status;
-}
-
-/* @@TODO: */
-#include <stdio.h>
-#define INPUT_MAXLINE (1024)
-
-/* @@TODO: red/black verification procedure */
-
-/*
- * @@TODO:
- */
-void print_tree(SNDICT_NODE *pNode, int depth) {
-  
-  int i = 0;
-  
-  /* Check parameter */
-  if ((pNode == NULL) || (depth < 0) || (depth >= INT_MAX)) {
-    abort();
-  }
-  
-  /* If there is a left subtree, recursively print it */
-  if (pNode->pLeft != NULL) {
-    print_tree(pNode->pLeft, depth + 1);
-  }
-  
-  /* Print a number of spaces equal to the depth */
-  for(i = 0; i < depth; i++) {
-    putchar(0x20);
-  }
-  
-  /* Print the current key */
-  printf("%s\n", &((pNode->key)[0]));
-  
-  /* If there is a right subtree, recursively print it */
-  if (pNode->pRight != NULL) {
-    print_tree(pNode->pRight, depth + 1);
-  }
-}
-
-/*
- * @@TODO:
- */
-int main(int argc, char *argv[]) {
-  
-  SNDICT *pDict = NULL;
-  char buf[INPUT_MAXLINE];
-  int status = 1;
-  int x = 0;
-  int line = 0;
-  char *pc = NULL;
-  
-  /* Initialize buffer */
-  memset(&(buf[0]), 0, INPUT_MAXLINE);
-  
-  /* Allocate case-insensitive dictionary */
-  pDict = sndict_alloc(0);
-  
-  /* Read each line of input */
-  while (fgets(&(buf[0]), INPUT_MAXLINE, stdin) != NULL) {
-    
-    /* Fail if length is up to full buffer, because the line might be
-     * too long in that case */
-    if (strlen(&(buf[0])) >= (INPUT_MAXLINE - 1)) {
-      fprintf(stderr, "Input line is too long!\n");
-      status = 0;
-    }
-    
-    /* Fail if line count about to overflow -- else, increment line
-     * count */
-    if (status) {
-      if (line >= INT_MAX) {
-        fprintf(stderr, "Too many lines in input!\n");
-        status = 0;
-      } else {
-        line++;
-      }
-    }
-    
-    /* End-trim characters not in visible ASCII range */
-    if (status) {
-      for(x = ((int) strlen(&(buf[0]))) - 1;
-          x >= 0;
-          x--) {
-        if ((buf[x] >= 0x20) && (buf[x] <= 0x7e)) {
-          break;
-        } else {
-          buf[x] = (char) 0;
-        }
-      }
-    }
-    
-    /* Lead-trim characters not in visible ASCII range */
-    if (status) {
-      for(x = 0;
-          ((buf[x] < 0x20) || (buf[x] > 0x7e)) &&
-            (buf[x] != 0);
-          x++);
-    }
-    
-    /* Insert trimmed string as key, with line number as value, unless
-     * trimmed length is zero, in which case line is blank */
-    if (status && (strlen(&(buf[x])) > 0)) {
-      if (!sndict_insert(pDict, &(buf[x]), line, 0)) {
-        fprintf(stderr, "Duplicate key!  Line %d\n", line);
-        status = 0;
-      }
-    }
-    
-    /* Leave loop if error */
-    if (!status) {
-      break;
-    }
-  }
-  
-  /* Check status of input */
-  if (status) {
-    if (!feof(stdin)) {
-      fprintf(stderr, "I/O error!\n");
-      status = 0;
-    }
-  }
-  
-  /* Print the tree */
-  if (status) {
-    if (pDict->pRoot != NULL) {
-      print_tree(pDict->pRoot, 0);
-    }
-  }
-  
-  /* Free dictionary */
-  sndict_free(pDict);
-  pDict = NULL;
-  
-  /* Return inverted status */
-  if (status) {
-    status = 0;
-  } else {
-    status = 1;
-  }
   return status;
 }

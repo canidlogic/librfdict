@@ -158,10 +158,171 @@ static char snu_ctable[256];
 static int  snu_ctable_init = 0;
 
 /* Function prototypes */
+static int sndict_keycmp(
+    const char * pKey1,
+    const char * pKey2,
+    int          sensitive);
+static SNDICT_NODE *sndict_find(SNDICT *pDict, const char *pKey);
 static int sndict_isred(SNDICT_NODE *pNode);
 static int sndict_isblack(SNDICT_NODE *pNode);
 static void sndict_rol(SNDICT_NODE *pNode, SNDICT *pDict);
 static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict);
+
+/*
+ * Perform a case-insensitive or case-sensitive string comparison.
+ * 
+ * pKey1 and pKey2 point to the null-terminated strings to compare.
+ * Neither may be NULL, but both may point to the same string.
+ * 
+ * If sensitive is non-zero, then this function calls through to the
+ * standard library strcmp() function to perform the comparison.  If
+ * sensitive is zero, then the strings will be compared such that 
+ * lowercase ASCII letters (0x61-0x7a) are mapped to uppercase ASCII
+ * letters (0x41-0x5a).
+ * 
+ * Parameters:
+ * 
+ *   pKey1 - the first null-terminated key
+ * 
+ *   pKey2 - the second null-terminated key
+ * 
+ *   sensitive - non-zero for case-sensitive comparison, zero for
+ *   case-insensitive comparison
+ * 
+ * Return:
+ * 
+ *   less than zero, equal to zero, or greater than zero, as key1 is
+ *   less than, equal to, or greater than key2
+ */
+static int sndict_keycmp(
+    const char * pKey1,
+    const char * pKey2,
+    int          sensitive) {
+  
+  int result = 0;
+  int i = 0;
+  int c1 = 0;
+  int c2 = 0;
+  
+  /* Check parameters */
+  if ((pKey1 == NULL) || (pKey2 == NULL)) {
+    abort();
+  }
+  
+  /* Do the comparison */
+  if (sensitive) {
+    /* Case-sensitive comparison -- call through to strcmp() */
+    result = strcmp(pKey1, pKey2);
+    
+  } else {
+    /* Case-insensitive comparison -- search for the first pair of
+     * bytes that are not equal (case-insensitive), or for the first
+     * terminating null */
+    for(i = 0; (pKey1[i] != 0) && (pKey2[i] != 0); i++) {
+      
+      /* Get the characters */
+      c1 = pKey1[i];
+      c2 = pKey2[i];
+      
+      /* Case mapping */
+      if ((c1 >= ASCII_LOWER_A) && (c1 <= ASCII_LOWER_Z)) {
+        c1 -= (ASCII_LOWER_A - ASCII_UPPER_A);
+      }
+      if ((c2 >= ASCII_LOWER_A) && (c2 >= ASCII_LOWER_Z)) {
+        c2 -= (ASCII_LOWER_A - ASCII_UPPER_A);
+      }
+      
+      /* Comparison */
+      if (c1 != c2) {
+        break;
+      }
+    }
+    
+    /* If we stopped on null termination, fetch the characters */
+    if ((pKey1[i] == 0) || (pKey2[i] == 0)) {
+      c1 = pKey1[i];
+      c2 = pKey2[i];
+    }
+    
+    /* Result is comparison of c1 and c2 */
+    if (c1 == c2) {
+      result = 0;
+    } else if (c1 > c2) {
+      result = 1;
+    } else if (c1 < c2) {
+      result = -1;
+    } else {
+      abort();  /* shouldn't happen */
+    }
+  }
+  
+  /* Return result */
+  return result;
+}
+
+/*
+ * Find a node in the dictionary matching the given key.
+ * 
+ * NULL is returned if no node in the dictionary matches that key.
+ * Comparisons are case-sensitive or case-insensitive depending on the
+ * setting of the sensitive flag in the dictionary.
+ * 
+ * pDict is the dictionary to search.
+ * 
+ * pKey is the null-terminated key to find.
+ * 
+ * Parameters:
+ * 
+ *   pDict - the dictionary
+ * 
+ *   pKey - the key to search for
+ * 
+ * Return:
+ * 
+ *   the dictionary node matching the key, or NULL if no node matches
+ *   the key
+ */
+static SNDICT_NODE *sndict_find(SNDICT *pDict, const char *pKey) {
+  
+  SNDICT_NODE *pCurrent = NULL;
+  int retval = 0;
+  
+  /* Check parameters */
+  if ((pDict == NULL) || (pKey == NULL)) {
+    abort();
+  }
+  
+  /* Start at root (or NULL if dictionary is empty) */
+  pCurrent = pDict->pRoot;
+  
+  /* Search until node found or we've gone through everything */
+  while (pCurrent != NULL) {
+    
+    /* Compare to current node */
+    retval = sndict_keycmp(
+              pKey, &((pCurrent->key)[0]), pDict->sensitive);
+    
+    /* Done if equal, else go down appropriate branch */
+    if (retval == 0) {
+      /* Equal -- done */
+      break;
+    
+    } else if (retval < 0) {
+      /* Key less than current node */
+      pCurrent = pCurrent->pLeft;
+      
+    } else if (retval > 0) {
+      /* Key greater than current node */
+      pCurrent = pCurrent->pRight;
+      
+    } else {
+      abort();  /* shouldn't happen */
+    }
+  }
+  
+  /* Return the matching node or NULL */
+  return pCurrent;
+}
 
 /*
  * Check whether a given node is red.
@@ -799,4 +960,31 @@ int sndict_insert(
   
   /* Return status */
   return status;
+}
+
+/*
+ * sndict_get function.
+ */
+long sndict_get(SNDICT *pDict, const char *pKey, long dvalue) {
+
+  SNDICT_NODE *pNode = NULL;
+  long result = 0;
+  
+  /* Check parameters */
+  if ((pDict == NULL) || (pKey == NULL)) {
+    abort();
+  }
+  
+  /* Search for the node */
+  pNode = sndict_find(pDict, pKey);
+  
+  /* If node found, take value from that; else, use dvalue */
+  if (pNode != NULL) {
+    result = pNode->val;
+  } else {
+    result = dvalue;
+  }
+  
+  /* Return result */
+  return result;
 }

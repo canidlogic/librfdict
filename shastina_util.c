@@ -5,9 +5,129 @@
  * main Shastina module, but it has auxiliary functions that are useful.
  */
 
+#include <limits.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Structure prototypes */
+struct SNDICT_TAG;
+typedef struct SNDICT_TAG SNDICT;
+
+struct SNDICT_NODE_TAG;
+typedef struct SNDICT_NODE_TAG SNDICT_NODE;
+
+/*
+ * The SNDICT structure.
+ * 
+ * (Structure prototype given earlier.)
+ * @@TODO: change above to header
+ * 
+ * Use the sndict_ functions to manipulate this structure.
+ */
+struct SNDICT_TAG {
+  /*
+   * Pointer to the root node of the dictionary.
+   * 
+   * If the dictionary is empty, this shall be a NULL pointer.
+   * 
+   * All nodes are dynamically allocated, and must be freed before this
+   * structure is freed.
+   */
+  SNDICT_NODE *pRoot;
+  
+  /*
+   * Case sensitivity flag.
+   * 
+   * If non-zero, comparisons shall be case-sensitive.  If zero,
+   * comparisons shall be case-insensitive.
+   */
+  int sensitive;
+};
+
+/*
+ * The SNDICT_NODE structure.
+ * 
+ * (Structure prototype given earlier.)
+ * @@TODO: change above to header
+ */
+struct SNDICT_NODE_TAG {
+  
+  /*
+   * Pointer to the parent of this node.
+   * 
+   * NULL if this node is the root node.
+   */
+  SNDICT_NODE *pParent;
+  
+  /*
+   * Pointer to the left child node of this node.
+   * 
+   * NULL if there is no left child of this node.
+   * 
+   * The left child node and all nodes in that subtree must have key
+   * values that are less than the key value of this node.
+   */
+  SNDICT_NODE *pLeft;
+  
+  /*
+   * Pointer to the right child node of this node.
+   * 
+   * NULL if there is no right child of this node.
+   * 
+   * The right child node and all nodes in that subtree must have key
+   * values that are greater than the key value of this node.
+   */
+  SNDICT_NODE *pRight;
+  
+  /*
+   * The value associated with this node.
+   * 
+   * This is the value that the key maps to.  It may be any long value.
+   */
+  long val;
+  
+  /*
+   * The red color flag.
+   * 
+   * If this value is non-zero, the node is a "red" node.  If this value
+   * is zero, the node is a "black" node.
+   * 
+   * The colors of the nodes must follow certain rules to ensure that
+   * the binary tree is kept in a proper balance.  The following are the
+   * rules:
+   * 
+   * (1) The root node (the node with a NULL parent pointer) must be
+   *     black.
+   * 
+   * (2) A red node may not have another red node as a parent.
+   * 
+   * (3) Let the "root path" from a node N be the sequence of nodes
+   *     N0, N1, ... Nn, where N0 is the node N, Nn is the root node,
+   *     and node N(n+1) is the parent of node N(n) for all n > 0.  Let
+   *     the "black depth" of a node be the number of black nodes in the
+   *     node's root path.  A node is an "exit node" if its left or
+   *     right pointer is NULL, or both are NULL.  All exit nodes in the
+   *     tree must have the same black depth.
+   */
+  char red;
+  
+  /*
+   * The string key of this node.
+   * 
+   * This is a null-terminated string.  It may be empty.
+   * 
+   * The actual string data is allocated beyond the end of the
+   * structure.  This field must therefore be the last field in the
+   * structure.
+   * 
+   * If case-insensitive comparisons are desired, the key string should
+   * already have its letters transformed to make everything uppercase
+   * (or everything lowercase).
+   */
+  char key[1];
+  
+};
 
 /*
  * The character mapping table.
@@ -161,6 +281,109 @@ int snu_ctable_ascii(int source_c) {
   
   /* Return mapped ASCII character */
   return ascii_c;
+}
+
+/*
+ * Allocate a new dictionary object.
+ * 
+ * The dictionary starts out empty.  If sensitive is non-zero, key
+ * comparisons will be case-sensitive.  Otherwise, key comparisons will
+ * be case-insensitive.
+ * 
+ * Dictionaries must be freed with sndict_free().
+ * 
+ * Parameters:
+ * 
+ *   sensitive - non-zero for case-sensitive comparisons, zero for
+ *   case-insensitive comparisons
+ * 
+ * Return:
+ * 
+ *   a new dictionary
+ */
+SNDICT *sndict_alloc(int sensitive) {
+  
+  SNDICT *pDict = NULL;
+  
+  /* Allocate dictionary structure and clear it */
+  pDict = (SNDICT *) malloc(sizeof(SNDICT));
+  if (pDict == NULL) {
+    abort();
+  }
+  memset(pDict, 0, sizeof(SNDICT));
+  
+  /* Initialize the dictionary */
+  pDict->pRoot = NULL;
+  pDict->sensitive = sensitive;
+  
+  /* Return the dictionary */
+  return pDict;
+}
+
+/*
+ * Free a dictionary object.
+ * 
+ * The call is ignored if the passed pointer is NULL.
+ * 
+ * Parameters:
+ * 
+ *   pDict - the dictionary to free
+ */
+void sndict_free(SNDICT *pDict) {
+  
+  SNDICT_NODE *pNode = NULL;
+  SNDICT_NODE *pParent = NULL;
+  
+  /* Only perform operation if point is non-NULL */
+  if (pDict != NULL) {
+    
+    /* Start at the root node (if there is one) */
+    pNode = pDict->pRoot;
+    
+    /* Keep releasing nodes until there are none left */
+    while (pNode != NULL) {
+      
+      /* We can only release nodes that have no child nodes, so keep
+       * iterating nodes until we reach a node with no children */
+      while((pNode->pLeft != NULL) || (pNode->pRight != NULL)) {
+        
+        if (pNode->pLeft != NULL) {
+          pNode = pNode->pLeft;
+        
+        } else if (pNode->pRight != NULL) {
+          pNode = pNode->pRight;
+          
+        } else {
+          abort();  /* shouldn't happen */
+        }
+      }
+      
+      /* We're now at a childless node -- get the parent node, or
+       * NULL */
+      pParent = pNode->pParent;
+      
+      /* If there is a parent node, unlink this node from the parent */
+      if (pParent != NULL) {
+        if (pParent->pLeft == pNode) {
+          pParent->pLeft = NULL;
+        
+        } else if (pParent->pRight == pNode) {
+          pParent->pRight = NULL;
+          
+        } else {
+          abort();  /* shouldn't happen */
+        }
+      }
+      
+      /* Release current node and set new current node to parent, or
+       * NULL if we just released the root node */
+      free(pNode);
+      pNode = pParent;
+    }
+    
+    /* We've released all nodes; now release the dictionary object */
+    free(pDict);
+  }
 }
 
 /* @@TODO: */

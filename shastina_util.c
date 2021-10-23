@@ -172,6 +172,207 @@ static char snu_ctable[256];
 static int  snu_ctable_init = 0;
 
 /* Function prototypes */
+static int sndict_isred(SNDICT_NODE *pNode);
+static int sndict_isblack(SNDICT_NODE *pNode);
+static void sndict_rol(SNDICT_NODE *pNode, SNDICT *pDict);
+static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict);
+
+/*
+ * Check whether a given node is red.
+ * 
+ * NULL may be passed.  This function returns non-zero only if the
+ * passed node is not NULL and it is red.
+ * 
+ * Parameters:
+ * 
+ *   pNode - the node to check, or NULL
+ * 
+ * Return:
+ * 
+ *   non-zero if the node exists and is red, zero otherwise
+ */
+static int sndict_isred(SNDICT_NODE *pNode) {
+  
+  int result = 0;
+  
+  if (pNode != NULL) {
+    if (pNode->red) {
+      result = 1;
+    } else {
+      result = 0;
+    }
+  
+  } else {
+    result = 0;
+  }
+  
+  return result;
+}
+
+/*
+ * Check whether a given node is black or doesn't exist.
+ * 
+ * NULL may be passed.  This function returns non-zero if the passed
+ * node is not NULL and it is black, or if the passed node is NULL.
+ * 
+ * Parameters:
+ * 
+ *   pNode - the node to check, or NULL
+ * 
+ * Return:
+ * 
+ *   non-zero if the node does not exist or it exists and is black, zero
+ *   otherwise
+ */
+static int sndict_isblack(SNDICT_NODE *pNode) {
+  
+  int result = 0;
+  
+  if (pNode != NULL) {
+    if (pNode->red) {
+      result = 0;
+    } else {
+      result = 1;
+    }
+  
+  } else {
+    result = 1;
+  }
+  
+  return result;
+}
+
+/*
+ * Rotate a node left.
+ * 
+ * The provided node may not be NULL.  The right child of the node must
+ * exist or a fault will occur.
+ * 
+ * Let N be the provided node, and R be its right child.  R's left
+ * subtree becomes N's right subtree, and N becomes R's left child.
+ * Both nodes swap parents in the process.
+ * 
+ * If the provided node was originally the root node of the dictionary,
+ * the dictionary is updated so that R becomes the new root.
+ * 
+ * Parameters:
+ * 
+ *   pNode - the node to rotate
+ * 
+ *   pDict - the dictionary
+ */
+static void sndict_rol(SNDICT_NODE *pNode, SNDICT *pDict) {
+  
+  SNDICT_NODE *pR = NULL;
+  
+  /* Check parameter */
+  if ((pNode == NULL) || (pDict == NULL)) {
+    abort();
+  }
+  if (pNode->pRight == NULL) {
+    abort();
+  }
+  
+  /* Define right child */
+  pR = pNode->pRight;
+  
+  /* Perform rotation */
+  pNode->pRight = pR->pLeft;
+  pR->pLeft = pNode;
+  
+  /* Update parent of the swapped subtree, if it isn't empty */
+  if (pNode->pRight != NULL) {
+    (pNode->pRight)->pParent = pNode;
+  }
+  
+  /* Swap parents of the two nodes */
+  pR->pParent = pNode->pParent;
+  pNode->pParent = pR;
+  
+  /* Update new parent, or root node */
+  if (pR->pParent != NULL) {
+    /* Update parent */
+    if ((pR->pParent)->pLeft == pNode) {
+      (pR->pParent)->pLeft = pR;
+      
+    } else if ((pR->pParent)->pRight == pNode) {
+      (pR->pParent)->pRight = pR;
+      
+    } else {
+      abort();  /* shouldn't happen */
+    }
+  
+  } else {
+    /* Update root */
+    pDict->pRoot = pR;
+  }
+}
+
+/*
+ * Rotate a node right.
+ * 
+ * The provided node may not be NULL.  The left child of the node must
+ * exist or a fault will occur.
+ * 
+ * Let N be the provided node, and L be its left child.  L's right
+ * subtree becomes N's left subtree, and N becomes L's right child.
+ * Both nodes swap parents in the process.
+ * 
+ * If the provided node was originally the root node of the dictionary,
+ * the dictionary is updated so that L becomes the new root.
+ * 
+ * Parameters:
+ * 
+ *   pNode - the node to rotate
+ * 
+ *   pDict - the dictionary
+ */
+static void sndict_ror(SNDICT_NODE *pNode, SNDICT *pDict) {
+  
+  SNDICT_NODE *pL = NULL;
+  
+  /* Check parameters */
+  if ((pNode == NULL) || (pDict == NULL)) {
+    abort();
+  }
+  if (pNode->pLeft == NULL) {
+    abort();
+  }
+  
+  /* Define left child */
+  pL = pNode->pLeft;
+  
+  /* Perform rotation */
+  pNode->pLeft = pL->pRight;
+  pL->pRight = pNode;
+  
+  /* Update parent of the swapped subtree, if it isn't empty */
+  if (pNode->pLeft != NULL) {
+    (pNode->pLeft)->pParent = pNode;
+  }
+  
+  /* Swap parents of the two nodes */
+  pL->pParent = pNode->pParent;
+  pNode->pParent = pL;
+  
+  /* Update new parent, or root node */
+  if (pL->pParent != NULL) {
+    /* Update parent */
+    if ((pL->pParent)->pLeft == pNode) {
+      (pL->pParent)->pLeft = pL;
+      
+    } else if ((pL->pParent)->pRight == pNode) {
+      (pL->pParent)->pRight = pL;
+      
+    } else {
+      abort();  /* shouldn't happen */
+    }
+  
+  } else {
+    /* Update root */
+    pDict->pRoot = pL;
+  }
+}
 
 /* 
  * Public functions
@@ -459,6 +660,8 @@ int sndict_insert(
   size_t slen = 0;
   SNDICT_NODE *pNode = NULL;
   SNDICT_NODE *pCurrent = NULL;
+  SNDICT_NODE *pParent = NULL;
+  SNDICT_NODE *pGrand = NULL;
   char *pc = NULL;
   int status = 1;
   int retval = 0;
@@ -573,7 +776,138 @@ int sndict_insert(
     }
   }
   
-  /* @@TODO: red-black rebalancing*/
+  /* 
+   * If new node is red, it is not the root of the tree.  In this case,
+   * check whether the parent is red.  If the parent is red, then the
+   * tree needs to be rebalanced because red nodes are not allowed to
+   * have red parents.
+   * 
+   * If the parent is red, then the parent of the parent (the
+   * grandparent) must also exist, because root nodes are black, and so
+   * the parent couldn't be a root node.  The grandparent must
+   * furthermore be black, because red nodes can't have red parents.
+   * 
+   * The first case we're going to handle is the (black) grandparent
+   * with two red children.  In this case, change both of the
+   * grandparent's children to black and change the grandparent to red.
+   * Set the grandparent as the new current node and apply the
+   * rebalancing procedures again, unless the new current nde is the
+   * root node, in which case color it black and no further rebalancing.
+   */
+  if (status) {
+    if (sndict_isred(pNode) && sndict_isred(pNode->pParent)) {
+      
+      /* Get the grandparent node, which much exist */
+      pGrand = (pNode->pParent)->pParent;
+      if (pGrand == NULL) {
+        abort();
+      }
+      
+      /* Rebalance while both of grandparent's children are red */
+      while(sndict_isred(pGrand->pLeft) &&
+            sndict_isred(pGrand->pRight)) {
+        
+        /* Set grandparent's children to black color */
+        (pGrand->pLeft)->red = 0;
+        (pGrand->pRight)->red = 0;
+        
+        /* If grandparent is the root node, set it to black; else, set
+         * it to red */
+        if (pGrand->pParent == NULL) {
+          pGrand->red = 0;
+        } else {
+          pGrand->red = 1;
+        }
+        
+        /* Set new node to grandparent node to continue process */
+        pNode = pGrand;
+        
+        /* If new node is red and its parent is red, update grandparent
+         * and continue rebalancing loop; else, done with this
+         * rebalancing step */
+        if (sndict_isred(pNode) && sndict_isred(pNode->pParent)) {
+          pGrand = (pNode->pParent)->pParent;
+          if (pGrand == NULL) {
+            abort();
+          }
+        } else {
+          break;
+        }
+      }
+    }
+  }
+    
+  /* 
+   * We've now handled all rebalancing cases where the grandparent has
+   * two red children.
+   * 
+   * We now must handle the cases where the grandparent has one black
+   * child, or a child that is missing.  We'll handle these cases with
+   * rotations, and unlike the former rebalancing case, we don't need to
+   * process this in a loop going back up to the root.
+   * 
+   * We only need to rebalance if the parent of the current node is red.
+   * If the parent of the current node is black, then there is no
+   * violation of the red node rules to fix.
+   */
+  if (status) {
+    if (sndict_isred(pNode) && sndict_isred(pNode->pParent)) {
+      
+      /* Get the grandparent node, which much exist */
+      pGrand = (pNode->pParent)->pParent;
+      if (pGrand == NULL) {
+        abort();
+      }
+      
+      /* Rebalance if one of the grandparent's children is black or
+       * missing */
+      if (sndict_isblack(pGrand->pLeft) ||
+          sndict_isblack(pGrand->pRight)) {
+        
+        /* Get parent node */
+        pParent = pNode->pParent;
+        
+        /* Handle rebalancing cases */
+        if ((pNode == pParent->pRight) && (pParent == pGrand->pLeft)) {
+          /* New node is right child of parent and parent is left child
+           * of grandparent */
+          pNode->red = 0;
+          pGrand->red = 1;
+          sndict_rol(pParent, pDict);
+          sndict_ror(pGrand, pDict);
+          
+        } else if ((pNode == pParent->pLeft) &&
+                    (pParent == pGrand->pRight)) {
+          /* New node is left child of parent and parent is right child
+           * of grandparent */
+          pNode->red = 0;
+          pGrand->red = 1;
+          sndict_ror(pParent, pDict);
+          sndict_rol(pGrand, pDict);
+          
+        } else if ((pNode == pParent->pLeft) &&
+                    (pParent == pGrand->pLeft)) {
+            /* New node is left child of parent and parent is left child
+             * of grandparent */
+            pParent->red = 0;
+            pGrand->red = 1;
+            sndict_ror(pGrand, pDict);
+            
+        } else if ((pNode == pParent->pRight) &&
+                    (pParent == pGrand->pRight)) {
+            /* New node is right child of parent and parent is right
+             * child of grandparent */
+            pParent->red = 0;
+            pGrand->red = 1;
+            sndict_rol(pGrand, pDict);
+            
+        } else {
+          abort();  /* shouldn't happen */
+        }
+        
+      }
+    }
+  }
   
   /* Return status */
   return status;
@@ -624,16 +958,16 @@ int main(int argc, char *argv[]) {
   pDict = sndict_alloc(0);
   
   /* Insert elements */
-  if (!sndict_insert(pDict, "Banana", 2, 1)) {
-    abort();
-  }
   if (!sndict_insert(pDict, "Apple", 1, 1)) {
     abort();
   }
-  if (!sndict_insert(pDict, "Orange", 4, 1)) {
+  if (!sndict_insert(pDict, "Banana", 2, 1)) {
     abort();
   }
   if (!sndict_insert(pDict, "Cherry", 3, 1)) {
+    abort();
+  }
+  if (!sndict_insert(pDict, "Orange", 4, 1)) {
     abort();
   }
   
